@@ -2,7 +2,7 @@ from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
-from .serializers import SignupSerializer
+from .serializers import SignupSerializer, UserProfileSerializer, UserHistorySerializer
 from .models import User
 
 
@@ -28,3 +28,19 @@ class LoginView(generics.GenericAPIView):
             'refresh_token': str(refresh),
             'expires_in': 3600
         })
+
+
+
+class UserMeView(generics.RetrieveAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserProfileSerializer
+
+    def get_object(self):
+        return self.request.user
+
+
+class UserHistoryView(generics.RetrieveAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserHistorySerializer
+    lookup_field = 'id'
+    queryset = User.objects.all()
