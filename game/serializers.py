@@ -5,10 +5,10 @@ from .models import GameSession, Score
 class GameSessionSerializer(serializers.ModelSerializer):
     class Meta:
         model = GameSession
-        fields = '__all__'
+        fields = ("id", "user", "chain", "active", "created_at", "updated_at", "ended_at")
 
 
 class ScoreSerializer(serializers.ModelSerializer):
     class Meta:
         model = Score
-        fields = '__all__'
+        fields = ("user", "session", "points", "recorded_at")
