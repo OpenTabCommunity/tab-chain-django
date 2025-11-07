@@ -4,6 +4,8 @@ from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 from .models import GameSession, Score
 from .serializers import GameSessionSerializer
+from django.db.models import Max
+from users.models import User
 
 MOVES = ["rock", "paper", "scissors"]
 
@@ -81,3 +83,24 @@ class EndSessionView(generics.GenericAPIView):
         session.save()
         final_score = len(session.chain)
         return Response({'final_score': final_score})
+
+
+class LeaderboardTopView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        limit = int(request.query_params.get('limit', 10))
+        users = (
+            User.objects.annotate(best_score=Max('score__points'))
+            .filter(best_score__isnull=False)
+            .order_by('-best_score')[:limit]
+        )
+        data = [
+            {
+                'rank': i + 1,
+                'username': u.username,
+                'best_score': u.best_score or 0
+            }
+            for i, u in enumerate(users)
+        ]
+        return Response(data)
