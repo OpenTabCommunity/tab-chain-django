@@ -1,0 +1,277 @@
+openapi: 3.0.3
+info:
+  title: Rock-Paper-Scissors Game API
+  version: 1.0.0
+  description: >
+    REST API for a game backend with JWT authentication, user management, 
+    and leaderboard features.
+
+servers:
+  - url: http://127.0.0.1:8000/api
+    description: Local development server
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    User:
+      type: object
+      properties:
+        id: { type: integer, example: 1 }
+        username: { type: string, example: alice }
+    TokenResponse:
+      type: object
+      properties:
+        access_token: { type: string }
+        refresh_token: { type: string }
+        expires_in: { type: integer, example: 3600 }
+    GameSession:
+      type: object
+      properties:
+        session_id: { type: string, format: uuid }
+        user_id: { type: integer }
+        chain:
+          type: array
+          items: { type: string }
+        active: { type: boolean }
+        created_at: { type: string, format: date-time }
+    Score:
+      type: object
+      properties:
+        points: { type: integer }
+        recorded_at: { type: string, format: date-time }
+
+security:
+  - bearerAuth: []
+
+paths:
+
+  /auth/signup:
+    post:
+      summary: Create user
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username: { type: string, example: alice }
+                password: { type: string, example: s3cret }
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Username exists or weak password
+
+  /auth/login:
+    post:
+      summary: Login user
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username: { type: string }
+                password: { type: string }
+      responses:
+        '200':
+          description: Successful login
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          description: Invalid credentials
+
+  /auth/refresh:
+    post:
+      summary: Refresh access token
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh_token: { type: string }
+      responses:
+        '200':
+          description: New access token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+
+  /play:
+    post:
+      summary: Submit a move (creates session if none)
+      tags: [Game]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                session_id: { type: string, format: uuid, example: null }
+                move: { type: string, enum: [rock, paper, scissors] }
+      responses:
+        '200':
+          description: Move result
+          content:
+            application/json:
+              examples:
+                correct:
+                  summary: Correct move
+                  value:
+                    result: correct
+                    session_id: "uuid"
+                    chain: ["rock","paper"]
+                    message: "paper beats rock"
+                    explanation: "paper covers rock"
+                    current_score: 2
+                lost:
+                  summary: Lost
+                  value:
+                    result: lost
+                    final_score: 3
+                    message: "paper does not beat scissors"
+                    explanation: "scissors cut paper"
+        '400':
+          description: Invalid move
+        '401':
+          description: Unauthorized
+
+  /session/{id}:
+    get:
+      summary: Get session info
+      tags: [Game]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Session data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GameSession'
+        '404':
+          description: Not found
+
+  /session/{id}/end:
+    post:
+      summary: End session manually
+      tags: [Game]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, example: user_quit }
+      responses:
+        '200':
+          description: Session ended
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  final_score: { type: integer }
+
+  /leaderboard/top:
+    get:
+      summary: Get top leaderboard
+      tags: [Leaderboard]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, example: 10 }
+          required: false
+      responses:
+        '200':
+          description: Leaderboard list
+          content:
+            application/json:
+              example:
+                - rank: 1
+                  username: bob
+                  best_score: 42
+                - rank: 2
+                  username: alice
+                  best_score: 36
+
+  /auth/me:
+    get:
+      summary: Get current user profile
+      tags: [User]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user info
+          content:
+            application/json:
+              example:
+                id: 12
+                username: alice
+                best_score: 11
+                sessions:
+                  - id: "uuid"
+                    active: true
+                    chain: ["rock","paper"]
+
+  /auth/{id}/history:
+    get:
+      summary: Get user history (scores + sessions)
+      tags: [User]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, example: 12 }
+      responses:
+        '200':
+          description: User history
+          content:
+            application/json:
+              example:
+                scores:
+                  - points: 5
+                    recorded_at: "2025-11-07T12:00:00Z"
+                sessions:
+                  - id: "uuid"
+                    chain: ["rock","paper"]
+                    active: false
