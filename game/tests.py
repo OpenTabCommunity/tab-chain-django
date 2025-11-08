@@ -26,7 +26,7 @@ class GameFlowTests(TestCase):
         GameSession.objects.all().delete()
         Score.objects.all().delete()
 
-    @patch("game.views.random.choice", return_value="scissors")  # باعث می‌شود حرکت کاربر همیشه rock را ببرد
+    @patch("game.views.random.choice", return_value="scissors")
     def test_play_win_and_end_session(self, mock_random):
         """win + end session """
         res = self.client.post("/api/play", {"move": "rock"}, format="json")
@@ -52,7 +52,7 @@ class GameFlowTests(TestCase):
         self.assertEqual(res.data["result"], "tie")
         self.assertIn("session_id", res.data)
 
-    @patch("game.views.random.choice", return_value="paper")  # کاربر می‌بازد (rock < paper)
+    @patch("game.views.random.choice", return_value="paper")
     def test_play_lose(self, mock_random):
         """lost"""
         res = self.client.post("/api/play", {"move": "rock"}, format="json")
