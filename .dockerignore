@@ -1,0 +1,12 @@
+.venv*
+.dockerignore
+.env*
+.editorconfig
+.pre-commit-config.yaml
+.ruff.toml
+docker-compose.yaml
+Dockerfile
+logs
+*log
+configs
+volumes
