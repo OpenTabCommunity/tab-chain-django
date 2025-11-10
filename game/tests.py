@@ -8,7 +8,6 @@ from unittest.mock import patch
 
 class GameFlowTests(TestCase):
     def setUp(self):
-
         self.client = APIClient()
         self.username = "bob"
         self.password = "pass123"
@@ -26,13 +25,19 @@ class GameFlowTests(TestCase):
         GameSession.objects.all().delete()
         Score.objects.all().delete()
 
-    @patch("game.views.random.choice", return_value="scissors")
-    def test_play_win_and_end_session(self, mock_random):
-        """win + end session """
+    @patch("game.views.get_ai_decision")
+    def test_play_win_and_end_session(self, mock_ai):
+        """win + end session"""
+        mock_ai.return_value = {
+            "result": "correct",
+            "message": "rock beats scissors",
+            "explanation": "rock smashes scissors"
+        }
+
         res = self.client.post("/api/play", {"move": "rock"}, format="json")
         self.assertEqual(res.status_code, 200)
-        self.assertIn("session_id", res.data)
         self.assertEqual(res.data["result"], "correct")
+        self.assertIn("session_id", res.data)
 
         session_id = res.data["session_id"]
 
@@ -44,22 +49,55 @@ class GameFlowTests(TestCase):
         self.assertFalse(session.active)
         self.assertIsNotNone(session.ended_at)
 
-    @patch("game.views.random.choice", return_value="rock")  # مساوی
-    def test_play_tie(self, mock_random):
+    @patch("game.views.get_ai_decision")
+    def test_play_tie(self, mock_ai):
         """equal"""
+        mock_ai.return_value = {
+            "result": "tie",
+            "message": "rock equals rock",
+            "explanation": "same move"
+        }
+
         res = self.client.post("/api/play", {"move": "rock"}, format="json")
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data["result"], "tie")
         self.assertIn("session_id", res.data)
 
-    @patch("game.views.random.choice", return_value="paper")
-    def test_play_lose(self, mock_random):
+    @patch("game.views.get_ai_decision")
+    def test_play_lose(self, mock_ai):
         """lost"""
+        mock_ai.return_value = {
+            "result": "lost",
+            "message": "paper beats rock",
+            "explanation": "paper covers rock"
+        }
+
         res = self.client.post("/api/play", {"move": "rock"}, format="json")
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data["result"], "lost")
-        self.assertIn("session_id", res.data)
         self.assertIn("final_score", res.data)
+        self.assertIn("message", res.data)
+        self.assertIn("explanation", res.data)
+
+    @patch("game.views.get_ai_decision")
+    def test_ai_service_unavailable(self, mock_ai):
+        """AI service returns error"""
+        mock_ai.return_value = {"result": "error", "message": "AI down"}
+
+        res = self.client.post("/api/play", {"move": "rock"}, format="json")
+        self.assertEqual(res.status_code, 503)
+        self.assertEqual(res.data["error"], "AI service unavailable")
+
+    def test_invalid_move_rejected(self):
+        """invalid move"""
+        res = self.client.post("/api/play", {"move": "banana"}, format="json")
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.data["error"], "invalid move")
+
+    def test_end_nonexistent_session(self):
+        """end session that not exist"""
+        res = self.client.post("/api/session/00000000-0000-0000-0000-000000000000/end", {}, format="json")
+        self.assertEqual(res.status_code, 404)
 
     def test_leaderboard_and_history(self):
         """best player list"""
@@ -72,14 +110,3 @@ class GameFlowTests(TestCase):
         self.assertTrue(len(res.data) >= 1)
         self.assertIn("username", res.data[0])
         self.assertIn("best_score", res.data[0])
-
-    def test_invalid_move_rejected(self):
-        """invalid move"""
-        res = self.client.post("/api/play", {"move": "banana"}, format="json")
-        self.assertEqual(res.status_code, 400)
-        self.assertEqual(res.data["error"], "invalid move")
-
-    def test_end_nonexistent_session(self):
-        """end session that not exist"""
-        res = self.client.post("/api/session/00000000-0000-0000-0000-000000000000/end", {}, format="json")
-        self.assertEqual(res.status_code, 404)

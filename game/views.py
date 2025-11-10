@@ -4,100 +4,118 @@ from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 from django.db.models import Max
 from django.db import transaction
+import asyncio
+
 from users.models import User
 from .models import GameSession, Score
 from .serializers import GameSessionSerializer
-import random
-
-MOVES = ["rock", "paper", "scissors"]
-WINNING = {
-    "rock": "scissors",
-    "paper": "rock",
-    "scissors": "paper",
-}
-
-
-def beats(a, b):
-    return WINNING.get(a) == b
+from .ai_client import get_ai_decision
 
 
 class PlayView(generics.GenericAPIView):
+    """
+    Handles a single play action by the user.
+    Sends the user's move to the AI service asynchronously
+    and records the result in the current session.
+    """
     permission_classes = [IsAuthenticated]
+
+    async def _call_ai(self, move: str):
+        try:
+            result = await get_ai_decision(move)
+            if not isinstance(result, dict):
+                return {"result": "error", "message": "Invalid AI response"}
+            return result
+        except Exception as e:
+            return {"result": "error", "message": str(e)}
 
     def post(self, request):
         move = request.data.get("move")
+        if not move:
+            return Response({"error": "missing move"}, status=400)
+
+        # validate move type
+        valid_moves = ["rock", "paper", "scissors"]
+        if move not in valid_moves:
+            return Response({"error": "invalid move"}, status=400)
+
         session_id = request.data.get("session_id")
-
-        if move not in MOVES:
-            return Response({"error": "invalid move"}, status=status.HTTP_400_BAD_REQUEST)
-
         if session_id:
             try:
                 session = GameSession.objects.get(id=session_id, user=request.user)
             except GameSession.DoesNotExist:
-                return Response({"error": "session not found"}, status=status.HTTP_404_NOT_FOUND)
+                return Response({"error": "session not found"}, status=404)
         else:
-            session = GameSession.objects.filter(user=request.user, active=True).first()
-            if not session:
-                session = GameSession.objects.create(user=request.user)
+            session = GameSession.objects.create(user=request.user)
 
-        ai_move = random.choice(MOVES)
+        ai_response = asyncio.run(self._call_ai(move))
+        result = ai_response.get("result")
+        message = ai_response.get("message")
+        explanation = ai_response.get("explanation")
+
+        if result == "error":
+            return Response({"error": "AI service unavailable"}, status=503)
+
         chain = session.chain + [move]
         session.chain = chain
         session.updated_at = timezone.now()
 
-        if beats(move, ai_move):
-            session.save()
+        if result == "correct":
+            current_score = len(chain)
             with transaction.atomic():
-                score, created = Score.objects.get_or_create(
-                    user=request.user, session=session, defaults={"points": 0}
-                )
-                score.points += 1
-                score.save()
+                session.save()
+                Score.objects.create(user=request.user, session=session, points=current_score)
 
             return Response({
                 "result": "correct",
                 "session_id": str(session.id),
                 "chain": chain,
-                "message": f"{move} beats {ai_move}",
-                "explanation": f"{move} covers {ai_move}" if move == "paper" else f"{move} beats {ai_move}",
-                "current_score": score.points,
-            }, status=status.HTTP_200_OK)
+                "message": message,
+                "explanation": explanation,
+                "current_score": current_score
+            })
 
-        if ai_move == move:
+        if result == "tie":
             session.save()
             return Response({
                 "result": "tie",
                 "session_id": str(session.id),
                 "chain": chain,
-                "message": f"Both played {move}",
-                "explanation": "It's a tie, play again!"
-            }, status=status.HTTP_200_OK)
+                "message": message,
+                "explanation": explanation
+            })
 
-        session.active = False
-        session.ended_at = timezone.now()
-        session.save()
+        if result == "lost":
+            session.active = False
+            session.ended_at = timezone.now()
+            with transaction.atomic():
+                session.save()
+                final_score = len(chain) - 1
+                Score.objects.create(user=request.user, session=session, points=final_score)
 
-        final_score = Score.objects.filter(user=request.user, session=session).first()
-        final_points = final_score.points if final_score else 0
+            return Response({
+                "result": "lost",
+                "final_score": final_score,
+                "message": message,
+                "explanation": explanation,
+            })
 
-        return Response({
-            "result": "lost",
-            "session_id": str(session.id),
-            "final_score": final_points,
-            "message": f"{move} does not beat {ai_move}",
-            "explanation": f"{ai_move} beats {move}",
-        }, status=status.HTTP_200_OK)
+        return Response({"error": "unexpected AI result"}, status=500)
 
 
 class SessionDetailView(generics.RetrieveAPIView):
-
+    """
+    Retrieve a specific game session by ID.
+    """
     queryset = GameSession.objects.all()
     serializer_class = GameSessionSerializer
     permission_classes = [IsAuthenticated]
 
 
 class EndSessionView(generics.GenericAPIView):
+    """
+    Manually end a game session and return the user's final score.
+    """
     permission_classes = [IsAuthenticated]
 
     def post(self, request, pk):
@@ -110,14 +128,15 @@ class EndSessionView(generics.GenericAPIView):
             return Response({
                 "message": "Session already ended",
                 "final_score": Score.objects.filter(user=request.user, session=session)
-                                            .aggregate(Max("points"))["points__max"] or 0
+                               .aggregate(Max("points"))["points__max"] or 0
             }, status=status.HTTP_200_OK)
 
         session.active = False
         session.ended_at = timezone.now()
         session.save()
 
-        final_score = Score.objects.filter(user=request.user, session=session).aggregate(Max("points"))["points__max"] or 0
+        final_score = Score.objects.filter(user=request.user, session=session).aggregate(Max("points"))[
+                          "points__max"] or 0
 
         return Response({
             "message": "Session ended successfully",
@@ -126,6 +145,9 @@ class EndSessionView(generics.GenericAPIView):
 
 
 class LeaderboardTopView(generics.ListAPIView):
+    """
+    Returns top N players with their best scores.
+    """
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
