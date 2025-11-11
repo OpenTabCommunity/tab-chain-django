@@ -135,5 +135,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 load_dotenv()
 
-AI_SERVICE_URL = os.getenv("AI_SERVICE_URL", "http://127.0.0.1:8001/api/ai/decision/")
-AI_TIMEOUT = float(os.getenv("AI_TIMEOUT", "3.0"))
+import os
+
+# === AI Service Configuration ===
+AI_SERVICE_URL = os.getenv("AI_SERVICE_URL", "")
+try:
+    AI_TIMEOUT = float(os.getenv("AI_TIMEOUT", 10))
+except ValueError:
+    AI_TIMEOUT = 10.0
