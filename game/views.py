@@ -16,7 +16,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Constants
-VALID_MOVES = ("rock", "paper", "scissors")
+MOVES = ("rock", "paper", "scissors")
 
 
 # Utils
@@ -37,14 +37,16 @@ class PlayView(generics.GenericAPIView):
 
     def post(self, request):
         move = request.data.get("move")
-        if move not in VALID_MOVES:
-            return Response(
-                {"error": "invalid move"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+
+        # Input validation
+        if not move:
+            return Response({"error": "missing move"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if move not in MOVES:
+            return Response({"error": "invalid move"}, status=status.HTTP_400_BAD_REQUEST)
 
         session_id = request.data.get("session_id")
-
+        session = None
         # Ensure thread-safety using select_for_update inside a transaction
         with transaction.atomic():
             if session_id:
@@ -185,9 +187,7 @@ class EndSessionView(generics.GenericAPIView):
         )
 
 
-# -----------------------------
 # Leaderboard View
-# -----------------------------
 class LeaderboardTopView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
