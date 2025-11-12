@@ -1,0 +1,42 @@
+[project]
+name = "open-share-server-django"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "mahdidlt13830510",email = "mahdi.dlt13830510@gmail.com"}
+]
+license = "LICENSE" 
+readme = "README.md"
+requires-python = "^3.11"
+dependencies = [
+    "django[argon2] (>=5.2.7,<6.0.0)",
+    "djangorestframework (>=3.16.1,<4.0.0)",
+    "django-environ (>=0.12.0,<0.13.0)",
+    "gunicorn (>=23.0.0,<24.0.0)",
+    "django-cors-headers (>=4.9.0,<5.0.0)",
+    "django-filter (>=25.2,<26.0)",
+    "celery (>=5.5.3,<6.0.0)",
+    "redis (>=6.4.0,<7.0.0)",
+    "orjson (>=3.11.3,<4.0.0)",
+    "djangorestframework-simplejwt (>=5.5.1,<6.0.0)",
+    "httpx (>=0.28.1,<0.29.0)",
+    "structlog (>=25.4.0,<26.0.0)",
+    "django-cacheops (>=7.2,<8.0)"
+]
+
+
+[project.optional-dependencies]
+extras = ["psycopg-c (>=3.2.10,<4.0.0)"]
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.13.3"
+pre-commit = "^4.3.0"
+psycopg2-binary = "^2.9.10"
+coverage = "^7.10.7"
+factory-boy = "^3.3.3"
+django-extensions = "^4.1"
+django-debug-toolbar = "^6.0.0"
+
