@@ -1,0 +1,60 @@
+services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: "${TABCHAIN_POSTGRES_DB:-postgres}"
+      POSTGRES_USER: "${TABCHAIN_POSTGRES_USER:-postgres}"
+      POSTGRES_PASSWORD: "${TABCHAIN_POSTGRES_PASSWORD:-postgres}"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TABCHAIN_POSTGRES_USER:-postgres} -d ${TABCHAIN_POSTGRES_DB:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "no"]
+    volumes:
+      - redisdata:/data
+    ports:
+      - "${TABCHAIN_COMPOSE_REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    environment:
+      RABBITMQ_DEFAULT_USER: "${RABBITMQ_USER:-guest}"
+      RABBITMQ_DEFAULT_PASS: "${RABBITMQ_PASS:-guest}"
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    volumes:
+      - rabbitmqdata:/var/lib/rabbitmq
+
+volumes:
+  pgdata:
+  redisdata:
+  static_volume:
+  media_volume:
+  rabbitmqdata:
+
+networks:
+  default:
+    name: tab_chain_network
+    driver: bridge
