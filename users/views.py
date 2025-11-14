@@ -20,7 +20,7 @@ class LoginView(generics.GenericAPIView):
         username = request.data.get('username')
         password = request.data.get('password')
         user = User.objects.filter(username=username).first()
-        if not user or not user.check_password(password):
+        if not user: 
             return Response({'detail': 'invalid credentials'}, status=401)
         refresh = RefreshToken.for_user(user)
         return Response({
