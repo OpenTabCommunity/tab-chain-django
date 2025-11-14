@@ -3,11 +3,11 @@ from pathlib import Path
 import environ
 
 # Base setup
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent
 
 # Initialize environment reader
 env = environ.Env(
-    DEBUG=(bool, False),
+    DEBUG=(bool, True),
     AI_TIMEOUT=(float, 5.0),
     AI_MAX_RETRIES=(int, 3),
     LEADERBOARD_LIMIT=(int, 50),
@@ -69,7 +69,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "core.wsgi.application"
+WSGI_APPLICATION = "game_api.wsgi.application"
 
 # Database
 DATABASES = {
