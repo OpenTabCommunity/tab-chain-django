@@ -1,16 +1,41 @@
 import os
 from pathlib import Path
 import environ
+from datetime import timedelta
 
 # Base setup
 BASE_DIR = Path(__file__).resolve().parent
 
-# Initialize environment reader
 env = environ.Env(
     DEBUG=(bool, True),
+
+    # Existing
     AI_TIMEOUT=(float, 5.0),
     AI_MAX_RETRIES=(int, 3),
     LEADERBOARD_LIMIT=(int, 50),
+
+    # ---- Added AI client settings ----
+    AI_SERVICE_URL=(str, "http://localhost:11434"),
+    AI_MODEL=(str, "gemma3"),
+    AI_MAX_TOKENS=(int, 120),
+    AI_STOP=(str, '["\\n\\n"]'),  # stored as JSON string
+
+    # Circuit-breaker
+    AI_CIRCUIT_THRESHOLD=(int, 6),
+    AI_CIRCUIT_COOLDOWN=(float, 30.0),
+
+    # HTTP connection limits
+    AI_MAX_KEEPALIVE=(int, 10),
+    AI_MAX_CONNECTIONS=(int, 50),
+
+    # Allowed moves (stored as string → parsed later)
+    AI_ALLOWED_MOVES=(str, '["rock", "paper", "scissors"]'),
+
+    # Optional logging flag
+    AI_LOG_LEVEL=(str, "INFO"),
+
+    # Optional API key
+    AI_API_KEY=(str, None),
 )
 
 # Read environment variables from .env file
@@ -41,6 +66,7 @@ INSTALLED_APPS = [
 
 # Middleware
 MIDDLEWARE = [
+    "game_api.middleware.SimpleCorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -75,7 +101,7 @@ WSGI_APPLICATION = "game_api.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": env("DB_ENGINE", default="django.db.backends.sqlite3"),
-        "NAME": env("DB_NAME", default=BASE_DIR / "db.sqlite3"),
+        "NAME": env("DB_NAME"),
         "USER": env("DB_USER", default=""),
         "PASSWORD": env("DB_PASSWORD", default=""),
         "HOST": env("DB_HOST", default=""),
@@ -117,6 +143,9 @@ REST_FRAMEWORK = {
     ),
 }
 
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=1),
+}
 # External AI Service Config
 AI_SERVICE_URL = env("AI_SERVICE_URL", default="")
 AI_API_KEY = env("AI_API_KEY", default="")
@@ -143,3 +172,20 @@ LOGGING = {
         "ai_client": {"handlers": ["console"], "level": "DEBUG", "propagate": False},
     },
 }
+
+
+AI_SERVICE_URL = env("AI_SERVICE_URL")
+AI_MODEL = env("AI_MODEL")
+AI_MAX_TOKENS = env("AI_MAX_TOKENS")
+AI_TIMEOUT = env("AI_TIMEOUT")
+AI_MAX_RETRIES = env("AI_MAX_RETRIES")
+
+AI_CIRCUIT_THRESHOLD = env("AI_CIRCUIT_THRESHOLD")
+AI_CIRCUIT_COOLDOWN = env("AI_CIRCUIT_COOLDOWN")
+
+AI_MAX_KEEPALIVE = env("AI_MAX_KEEPALIVE")
+AI_MAX_CONNECTIONS = env("AI_MAX_CONNECTIONS")
+
+AI_LOG_LEVEL = env("AI_LOG_LEVEL")
+AI_API_KEY = env("AI_API_KEY")
+
