@@ -49,12 +49,7 @@ COPY pyproject.toml poetry.lock* /app/
 # install project deps into venv (no-root ensures deps installed to /venv)
 # For production container builds, pass BUILD_ENV=production to build args and set extras accordingly
 ARG BUILD_ENV=development
-RUN --mount=type=cache,target=/root/.cache/pip \
-    if [ "${BUILD_ENV}" = "production" ]; then \
-      /venv/bin/poetry install --no-dev --no-interaction --no-ansi; \
-    else \
-      /venv/bin/poetry install --no-interaction --no-ansi; \
-    fi
+RUN --mount=type=cache,target=/root/.cache/pip /venv/bin/poetry install --no-interaction --no-ansi
 
 # Development image 
 FROM base AS dev
