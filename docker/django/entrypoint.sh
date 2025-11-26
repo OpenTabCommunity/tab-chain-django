@@ -4,7 +4,7 @@ set -o nounset
 set -o pipefail
 
 postgres_ready() {
-  python - "$OPENSHARE_POSTGRES_DB" "$OPENSHARE_POSTGRES_USER" "$OPENSHARE_POSTGRES_PASSWORD" "$OPENSHARE_POSTGRES_HOST" "$OPENSHARE_POSTGRES_PORT" <<'PY'
+  python - "$TABCHAIN_POSTGRES_DB" "$TABCHAIN_POSTGRES_USER" "$TABCHAIN_POSTGRES_PASSWORD" "$TABCHAIN_POSTGRES_HOST" "$TABCHAIN_POSTGRES_PORT" <<'PY'
 import sys, time
 from time import sleep
 try:
@@ -22,14 +22,14 @@ sys.exit(0)
 PY
 }
 
-: "${OPENSHARE_POSTGRES_HOST:=db}"
-: "${OPENSHARE_POSTGRES_PORT:=5432}"
-: "${OPENSHARE_POSTGRES_DB:=postgres}"
-: "${OPENSHARE_POSTGRES_USER:=postgres}"
-: "${OPENSHARE_POSTGRES_PASSWORD:=}"
+: "${TABCHAIN_POSTGRES_HOST:=db}"
+: "${TABCHAIN_POSTGRES_PORT:=5432}"
+: "${TABCHAIN_POSTGRES_DB:=postgres}"
+: "${TABCHAIN_POSTGRES_USER:=postgres}"
+: "${TABCHAIN_POSTGRES_PASSWORD:=postgres}"
 
 # Wait for Postgres to be ready
-echo "Waiting for Postgres at ${OPENSHARE_POSTGRES_HOST}:${OPENSHARE_POSTGRES_PORT}..."
+echo "Waiting for Postgres at ${TABCHAIN_POSTGRES_HOST}:${TABCHAIN_POSTGRES_PORT}..."
 TRIES=0
 until postgres_ready; do
   TRIES=$((TRIES+1))
@@ -45,10 +45,11 @@ echo "Postgres is available."
 if [ "${DJANGO_ENV:-development}" = "production" ] || [ "${RUN_MIGRATIONS:-1}" = "1" ]; then
   echo "Apply migrations..."
   python manage.py makemigrations --no-input || true
+  python manage.py makemigrations game
   python manage.py migrate --no-input
 
   echo "Collect static files..."
-  python manage.py collectstatic --noinput
+  # python manage.py collectstatic --noinput
 fi
 
 # Optionally compile messages
@@ -61,7 +62,7 @@ if [ "$#" -gt 0 ]; then
   exec "$@"
 else
   # Default: development uses runserver; production Dockerfile sets CMD to gunicorn
-  if [ "${DJANGO_ENV:-development}" = "development" ]; then
+  if [ "${DJANGO_ENV:-production}" = "development" ]; then
     exec python manage.py runserver 0.0.0.0:8000
   else
     exec gunicorn project.wsgi:application --bind 0.0.0.0:8000 --workers "${GUNICORN_WORKERS:-3}" --timeout "${GUNICORN_TIMEOUT:-120}"
