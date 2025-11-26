@@ -18,7 +18,6 @@ class LoginView(generics.GenericAPIView):
 
     def post(self, request):
         username = request.data.get('username')
-        password = request.data.get('password')
         user = User.objects.filter(username=username).first()
         if not user: 
             return Response({'detail': 'invalid credentials'}, status=401)
